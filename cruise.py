@@ -10,6 +10,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import pandas
 
+
 def save_table(card_number: str, password: str, url: str) -> str:
     # headless mode
     option = Options()
@@ -74,10 +75,11 @@ def refine_table(file_name: str) -> pandas.DataFrame:
     df = pandas.read_pickle(file_name)
     df.columns = [col.split()[0] for col in df.columns]
     # df2 = df.loc[:, ['貸出更新', 'タイトル', '貸出日', '返却期限日']]
-    df2 = df.loc[:, ['タイトル', '返却期限日']]
-    df2['ID'] = [file_name.replace('.zip', '')] * len(df2)
+    df = df.loc[:, ['貸出更新', 'タイトル', '返却期限日']]
+    df['返却期限日'] = pandas.to_datetime(df['返却期限日'])
+    df['ID'] = [file_name.replace('.zip', '')] * len(df)
     # df2 = df2.reindex(columns=['タイトル', '返却期限日''ID', ])
-    return df2.dropna(how='any')
+    return df.dropna(how='any')
 
 
 def create_email_message(zips: list) -> str:
@@ -87,7 +89,19 @@ def create_email_message(zips: list) -> str:
 
     df = df.sort_values(by='タイトル')
     df = df.sort_values(by='返却期限日')
+    are_extentable = [_update != "再貸出" for _update in df['貸出更新'].to_list()]
+    df = df.loc[:, ['タイトル', '返却期限日', 'ID']]
+
     message = df.to_html(index=False)
+    lines = []
+    for _line in message.split('\n'):
+        if "<td>2022" in _line:
+            if are_extentable.pop(0):
+                _line = _line.replace('<td>2022',
+                                      '<td style="text-decoration: underline;">2022')
+        lines.append(_line)
+
+    message = "\n".join(lines)
     message = message.replace(
         '<table border="1" class="dataframe">',
         '<table border="1" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px;">')
@@ -99,7 +113,7 @@ def create_email_message(zips: list) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <style>
 body{{font-family: "Helvetica Neue", "Helvetica", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Arial", "Yu Gothic", "Meiryo", sans-serif;}}
-</style></head><body>
+</style></head><body>下線つき日付は最終期限（すでに延長済）
 {message}
 </body></html>
 '''
