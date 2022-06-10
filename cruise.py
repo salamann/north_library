@@ -1,6 +1,6 @@
 
 from time import sleep
-from datetime import datetime
+from datetime import datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 
@@ -32,10 +32,10 @@ def save_table(card_number: str, password: str, url: str) -> str:
     sleep(5)
     handle_array = driver.window_handles
     driver.switch_to.window(handle_array[-1])
+    extend_rentals(driver)
     zip_name = f'{card_number}.zip'
     df = pandas.read_html(driver.page_source)[4]
     df.to_pickle(zip_name)
-    extend_rentals(driver)
     return card_number
 
 
@@ -80,6 +80,13 @@ def refine_table(file_name: str) -> pandas.DataFrame:
     df['ID'] = [file_name.replace('.zip', '')] * len(df)
     # df2 = df2.reindex(columns=['タイトル', '返却期限日''ID', ])
     return df.dropna(how='any')
+
+
+def generate_earliest_date(zips: list) -> str:
+    df = pandas.DataFrame()
+    for zip in zips:
+        df = pandas.concat([df, refine_table(f"{zip}.zip")])
+    return min(df['返却期限日'])
 
 
 def create_email_message(zips: list) -> str:
@@ -148,7 +155,9 @@ if __name__ == "__main__":
         save_table(key, card_numbers[key], url)
 
     message = create_email_message(keys)
+    return_date = generate_earliest_date(keys)
 
-    for to_email in to_emails:
-        send_email(to_email, title, message, smtp_server,
-                   smtp_port_number, smtp_user_name, smtp_password, from_email)
+    if return_date - timedelta(days=3) < datetime.today():
+        for to_email in to_emails:
+            send_email(to_email, title, message, smtp_server,
+                       smtp_port_number, smtp_user_name, smtp_password, from_email)
