@@ -10,6 +10,8 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import pandas
 
+RESERVE_FILE_EXT = "_reserve"
+
 
 def save_table(card_number: str, password: str, url: str) -> str:
     # headless mode
@@ -36,6 +38,12 @@ def save_table(card_number: str, password: str, url: str) -> str:
     zip_name = f'{card_number}.zip'
     df = pandas.read_html(driver.page_source)[4]
     df.to_pickle(zip_name)
+
+    # reserve df
+    zip_name2 = f"{zip_name.split('.')[0]}{RESERVE_FILE_EXT}.zip"
+    df2 = pandas.read_html(driver.page_source)[6]
+    df2.to_pickle(zip_name2)
+
     return card_number
 
 
@@ -71,6 +79,16 @@ def extend_rentals(driver: WebDriver) -> None:
             is_loop = False
 
 
+# def get_reserve_df(driver: WebDriver):
+#     reserve_button = driver.find_element(
+#         by=By.XPATH, value="//a[@href='#ContentRsv']")
+#     reserve_button.click()
+#     table = driver.find_element(by=By.XPATH,
+#                                 value="//table[tbody[tr[th[span[contains(text(), 'No.']]]]]")
+
+#     pass
+
+
 def refine_table(file_name: str) -> pandas.DataFrame:
     df = pandas.read_pickle(file_name)
     df.columns = [col.split()[0] for col in df.columns]
@@ -82,6 +100,13 @@ def refine_table(file_name: str) -> pandas.DataFrame:
     return df.dropna(how='any')
 
 
+def refine_table2(file_name: str) -> pandas.DataFrame:
+    df = pandas.read_pickle(file_name)
+    df = df.loc[:, ["タイトル", "状況", "取り置き期限"]]
+    df['ID'] = [file_name.split('_')[0]] * len(df)
+    return df
+
+
 def generate_earliest_date(zips: list) -> str:
     df = pandas.DataFrame()
     for zip in zips:
@@ -89,13 +114,25 @@ def generate_earliest_date(zips: list) -> str:
     return min(df['返却期限日'])
 
 
+def is_available_reserve(zips: list) -> bool:
+    df = pandas.DataFrame()
+    for zip in zips:
+        df = pandas.concat([df, refine_table2(f"{zip}{RESERVE_FILE_EXT}.zip")])
+    return any(True for _ in df.loc[:, "状況"].to_list() if "準備できました" in _)
+
+
 def create_email_message(zips: list) -> str:
     df = pandas.DataFrame()
+    df2 = pandas.DataFrame()
     for zip in zips:
         df = pandas.concat([df, refine_table(f"{zip}.zip")])
 
+        df2 = pandas.concat(
+            [df2, refine_table2(f"{zip}{RESERVE_FILE_EXT}.zip")])
+
     df = df.sort_values(by='タイトル')
     df = df.sort_values(by='返却期限日')
+    df2 = df2.sort_values(by='取り置き期限')
     are_extentable = [_update != "再貸出" for _update in df['貸出更新'].to_list()]
     df = df.loc[:, ['タイトル', '返却期限日', 'ID']]
 
@@ -112,6 +149,12 @@ def create_email_message(zips: list) -> str:
     message = message.replace(
         '<table border="1" class="dataframe">',
         '<table border="1" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px;">')
+
+    message2 = df2.to_html(index=False)
+    message2 = message2.replace(
+        '<table border="1" class="dataframe">',
+        '<table border="1" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px;">')
+
     message = f'''<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -120,8 +163,11 @@ def create_email_message(zips: list) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <style>
 body{{font-family: "Helvetica Neue", "Helvetica", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Arial", "Yu Gothic", "Meiryo", sans-serif;}}
-</style></head><body>下線つき日付は最終期限（すでに延長済）
+</style></head><body>
+<p>下線つき日付は最終期限（すでに延長済）</p>
 {message}
+<p>予約リスト</p>
+{message2}
 </body></html>
 '''
     with open('message.html', 'w', encoding='utf-8') as f:
@@ -156,8 +202,9 @@ if __name__ == "__main__":
 
     message = create_email_message(keys)
     return_date = generate_earliest_date(keys)
+    is_available_reserve = is_available_reserve(keys)
 
-    if return_date - timedelta(days=3) < datetime.today():
+    if (return_date - timedelta(days=3) < datetime.today()) or (is_available_reserve):
         for to_email in to_emails:
             send_email(to_email, title, message, smtp_server,
                        smtp_port_number, smtp_user_name, smtp_password, from_email)
