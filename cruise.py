@@ -114,7 +114,7 @@ def generate_earliest_date(zips: list) -> str:
     return min(df['返却期限日'])
 
 
-def is_available_reserve(zips: list) -> bool:
+def availablility_reserve(zips: list) -> bool:
     df = pandas.DataFrame()
     for zip in zips:
         df = pandas.concat([df, refine_table2(f"{zip}{RESERVE_FILE_EXT}.zip")])
@@ -189,7 +189,7 @@ def send_email(to_email, subject, message, smtp_server, smtp_port_number, smtp_u
     server.quit()
 
 
-if __name__ == "__main__":
+def run(condition_name="standard"):
     from config import card_numbers
     from config import to_emails, from_email, title
     from config import smtp_server, smtp_port_number, smtp_user_name, smtp_password
@@ -197,14 +197,25 @@ if __name__ == "__main__":
 
     keys = list(card_numbers.keys())
 
-    for key, value in card_numbers.items():
+    for key in card_numbers.keys():
+        print(key)
         save_table(key, card_numbers[key], url)
 
     message = create_email_message(keys)
     return_date = generate_earliest_date(keys)
-    is_available_reserve = is_available_reserve(keys)
+    is_available_reserve = availablility_reserve(keys)
 
-    if (return_date - timedelta(days=3) < datetime.today()) or (is_available_reserve):
+    if condition_name == "standard":
+        condition = (return_date - timedelta(days=3) <
+                     datetime.today()) or (is_available_reserve)
+    else:
+        condition = True
+    if condition:
         for to_email in to_emails:
             send_email(to_email, title, message, smtp_server,
                        smtp_port_number, smtp_user_name, smtp_password, from_email)
+
+
+if __name__ == "__main__":
+    # run(condition_name="test")
+    run()
