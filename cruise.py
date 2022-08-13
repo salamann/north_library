@@ -34,49 +34,60 @@ def save_table(card_number: str, password: str, url: str) -> str:
     sleep(5)
     handle_array = driver.window_handles
     driver.switch_to.window(handle_array[-1])
-    extend_rentals(driver)
+    is_successful = extend_rentals(driver)
     zip_name = f'{card_number}.zip'
     df = pandas.read_html(driver.page_source)[4]
     df.to_pickle(zip_name)
 
     # reserve df
     zip_name2 = f"{zip_name.split('.')[0]}{RESERVE_FILE_EXT}.zip"
-    df2 = pandas.read_html(driver.page_source)[6]
+    if is_successful:
+        reserve_index = 6
+    else:
+        reserve_index = 5
+    df2 = pandas.read_html(driver.page_source)[reserve_index]
     df2.to_pickle(zip_name2)
 
-    return card_number
+    return is_successful
 
 
 def extend_rentals(driver: WebDriver) -> None:
     date_today = str(datetime.today().date())
 
     is_loop = True
+    is_successful = False
     while is_loop:
         df = pandas.read_html(driver.page_source)[4]
+        if all(isinstance(_col, int) for _col in df.columns):
+            break
         df.columns = [col.split()[0] for col in df.columns]
         df = df.loc[:, ['貸出更新', 'タイトル', '返却期限日']]
         df = df.dropna(how='any')
         df['返却期限日'] = pandas.to_datetime(df['返却期限日'])
         are_deadline = [str(_date.date()) ==
                         date_today for _date in df['返却期限日'].to_list()]
-        are_updatable = [_update == "再貸出" for _update in df['貸出更新'].to_list()]
+        are_updatable = [_update ==
+                         "再貸出" for _update in df['貸出更新'].to_list()]
         are_update_now = [_d & _u for _d, _u in zip(
             are_deadline, are_updatable) if _u]
 
         buttons = driver.find_elements(
             by=By.XPATH, value="//button[@value='再貸出']")
 
+        is_successful = True
         if any(are_update_now):
             buttons[are_update_now.index(True)].click()
             pass
             sleep(2)
 
-            extend_button = driver.find_element(by=By.NAME, value="chkLKOUSIN")
+            extend_button = driver.find_element(
+                by=By.NAME, value="chkLKOUSIN")
             extend_button.click()
             pass
             sleep(2)
         else:
             is_loop = False
+    return is_successful
 
 
 # def get_reserve_df(driver: WebDriver):
@@ -107,10 +118,11 @@ def refine_table2(file_name: str) -> pandas.DataFrame:
     return df
 
 
-def generate_earliest_date(zips: list) -> str:
+def generate_earliest_date(zips: list, res_extend: dict) -> str:
     df = pandas.DataFrame()
     for zip in zips:
-        df = pandas.concat([df, refine_table(f"{zip}.zip")])
+        if res_extend[zip]:
+            df = pandas.concat([df, refine_table(f"{zip}.zip")])
     return min(df['返却期限日'])
 
 
@@ -121,11 +133,12 @@ def availablility_reserve(zips: list) -> bool:
     return any(True for _ in df.loc[:, "状況"].to_list() if "準備できました" in _)
 
 
-def create_email_message(zips: list) -> str:
+def create_email_message(zips: list, res_extend: dict) -> str:
     df = pandas.DataFrame()
     df2 = pandas.DataFrame()
     for zip in zips:
-        df = pandas.concat([df, refine_table(f"{zip}.zip")])
+        if res_extend[zip]:
+            df = pandas.concat([df, refine_table(f"{zip}.zip")])
 
         df2 = pandas.concat(
             [df2, refine_table2(f"{zip}{RESERVE_FILE_EXT}.zip")])
@@ -197,12 +210,13 @@ def run(condition_name="standard"):
 
     keys = list(card_numbers.keys())
 
+    res_extend = {}
     for key in card_numbers.keys():
         print(key)
-        save_table(key, card_numbers[key], url)
+        res_extend[key] = save_table(key, card_numbers[key], url)
 
-    message = create_email_message(keys)
-    return_date = generate_earliest_date(keys)
+    message = create_email_message(keys, res_extend)
+    return_date = generate_earliest_date(keys, res_extend)
     is_available_reserve = availablility_reserve(keys)
 
     if condition_name == "standard":
