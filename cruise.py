@@ -36,12 +36,14 @@ def save_table(card_number: str, password: str, url: str) -> str:
     driver.switch_to.window(handle_array[-1])
     is_successful = extend_rentals(driver)
     zip_name = f'{card_number}.zip'
-    df = pandas.read_html(driver.page_source)[4]
+    dfs = pandas.read_html(driver.page_source)
+    df = dfs[4]
     df.to_pickle(zip_name)
 
     # reserve df
     zip_name2 = f"{zip_name.split('.')[0]}{RESERVE_FILE_EXT}.zip"
-    if is_successful:
+    is_reserve = (str(dfs[5]).find("シリーズ予約組替") != -1)
+    if is_successful & is_reserve:
         reserve_index = 6
     else:
         reserve_index = 5
@@ -113,8 +115,11 @@ def refine_table(file_name: str) -> pandas.DataFrame:
 
 def refine_table2(file_name: str) -> pandas.DataFrame:
     df = pandas.read_pickle(file_name)
-    df = df.loc[:, ["タイトル", "状況", "取り置き期限"]]
-    df['ID'] = [file_name.split('_')[0]] * len(df)
+    if str(df).find("予約データはありません") == -1:
+        df = df.loc[:, ["タイトル", "状況", "取り置き期限"]]
+        df['ID'] = [file_name.split('_')[0]] * len(df)
+    else:
+        df = pandas.DataFrame()
     return df
 
 
