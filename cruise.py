@@ -9,6 +9,7 @@ from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import pandas
+from webdriver_manager.chrome import ChromeDriverManager
 
 RESERVE_FILE_EXT = "_reserve"
 
@@ -17,10 +18,10 @@ def save_table(card_number: str, password: str, url: str) -> str:
     # headless mode
     option = Options()
     option.add_argument('--headless')
-    driver = webdriver.Chrome(options=option)
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=option)
 
     # normal mode
-    # driver = webdriver.Chrome()
+    # driver = webdriver.Chrome(ChromeDriverManager().install())
 
     driver.get(url)
     user_card_no = driver.find_element(by=By.NAME, value="usercardno")
