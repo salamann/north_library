@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 import pandas
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -18,10 +19,11 @@ def save_table(card_number: str, password: str, url: str) -> str:
     # headless mode
     option = Options()
     option.add_argument('--headless')
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=option)
+    driver = webdriver.Chrome(
+        Service(ChromeDriverManager().install(), options=option))
 
     # normal mode
-    # driver = webdriver.Chrome(ChromeDriverManager().install())
+    # driver = webdriver.Chrome(Service(ChromeDriverManager().install()))
 
     driver.get(url)
     user_card_no = driver.find_element(by=By.NAME, value="usercardno")
