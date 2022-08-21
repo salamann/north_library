@@ -20,7 +20,7 @@ def save_table(card_number: str, password: str, url: str) -> str:
     option = Options()
     option.add_argument('--headless')
     driver = webdriver.Chrome(
-        Service(ChromeDriverManager().install(), options=option))
+        Service(ChromeDriverManager().install()), options=option)
 
     # normal mode
     # driver = webdriver.Chrome(Service(ChromeDriverManager().install()))
