@@ -153,7 +153,8 @@ def create_email_message(zips: list, res_extend: dict) -> str:
 
     df = df.sort_values(by='タイトル')
     df = df.sort_values(by='返却期限日')
-    df2 = df2.sort_values(by='取り置き期限')
+    if '取り置き期限' in df2.columns:
+        df2 = df2.sort_values(by='取り置き期限')
     are_extentable = [_update != "再貸出" for _update in df['貸出更新'].to_list()]
     df = df.loc[:, ['タイトル', '返却期限日', 'ID']]
 
