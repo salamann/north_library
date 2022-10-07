@@ -118,7 +118,7 @@ def refine_table(file_name: str) -> pandas.DataFrame:
 
 def refine_table2(file_name: str) -> pandas.DataFrame:
     df = pandas.read_pickle(file_name)
-    if str(df).find("予約データはありません") == -1:
+    if (str(df).find("予約データはありません") == -1) & (str(df).find("予約取消データはありません。") == -1):
         df = df.loc[:, ["タイトル", "状況", "取り置き期限"]]
         df['ID'] = [file_name.split('_')[0]] * len(df)
     else:
