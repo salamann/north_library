@@ -239,6 +239,16 @@ def run(condition_name="standard"):
                        smtp_port_number, smtp_user_name, smtp_password, from_email)
 
 
+def run_and_email_if_errors_exists():
+    from config import from_email, index_email_for_error, to_emails
+    from config import smtp_server, smtp_port_number, smtp_user_name, smtp_password
+    try:
+        run()
+    except Exception as e:
+        send_email(to_emails[index_email_for_error], "Errors during Library cruising", str(e), smtp_server,
+                   smtp_port_number, smtp_user_name, smtp_password, from_email)
+
+
 if __name__ == "__main__":
     # run(condition_name="test")
-    run()
+    run_and_email_if_errors_exists()
