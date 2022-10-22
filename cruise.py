@@ -138,7 +138,10 @@ def availablility_reserve(zips: list) -> bool:
     df = pandas.DataFrame()
     for zip in zips:
         df = pandas.concat([df, refine_table2(f"{zip}{RESERVE_FILE_EXT}.zip")])
-    return any(True for _ in df.loc[:, "状況"].to_list() if "準備できました" in _)
+    if not df.empty:
+        return any(True for _ in df.loc[:, "状況"].to_list() if "準備できました" in _)
+    else:
+        return False
 
 
 def create_email_message(zips: list, res_extend: dict) -> str:
@@ -216,6 +219,7 @@ def run(condition_name="standard"):
     from config import to_emails, from_email, title
     from config import smtp_server, smtp_port_number, smtp_user_name, smtp_password
     from config import url
+    print(datetime.today())
 
     keys = list(card_numbers.keys())
 
