@@ -163,11 +163,12 @@ def create_email_message(zips: list, res_extend: dict) -> str:
 
     message = df.to_html(index=False)
     lines = []
+    current_year = str(datetime.today().date())[0:4]
     for _line in message.split('\n'):
-        if "<td>2022" in _line:
+        if f"<td>{current_year}" in _line:
             if are_extentable.pop(0):
-                _line = _line.replace('<td>2022',
-                                      '<td style="text-decoration: underline;">2022')
+                _line = _line.replace(f'<td>{current_year}',
+                                      f'<td style="text-decoration: underline;">{current_year}')
         lines.append(_line)
 
     message = "\n".join(lines)
